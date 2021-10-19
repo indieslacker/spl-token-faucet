@@ -2,9 +2,8 @@ use solana_program::{
     account_info::next_account_info,
     account_info::AccountInfo,
     entrypoint::ProgramResult,
-    info,
+    msg,
     program_error::ProgramError,
-    program_option::COption,
     program_pack::Pack,
     pubkey::Pubkey,
     sysvar::{rent::Rent, Sysvar},
@@ -22,16 +21,12 @@ impl Processor {
         let instruction = FaucetInstruction::unpack(input)?;
         match instruction {
             FaucetInstruction::InitFaucet { amount } => {
-                info!("Instruction: InitFaucet");
+                msg!("Instruction: InitFaucet");
                 Self::process_init_faucet(accounts, amount, program_id)?
             }
             FaucetInstruction::MintTokens { amount } => {
-                info!("Instruction: MintTokens");
+                msg!("Instruction: MintTokens");
                 Self::process_mint_tokens(accounts, amount, program_id)?
-            }
-            FaucetInstruction::CloseFaucet => {
-                info!("Instruction: CloseFaucet");
-                Self::process_close_faucet(accounts, program_id)?
             }
         }
         Ok(())
@@ -70,15 +65,7 @@ impl Processor {
             return Err(FaucetError::AccountNotRentExempt.into());
         }
 
-        let admin_acc = next_account_info(account_info_iter);
-
-        let admin_pubkey = match admin_acc {
-            Ok(acc) => COption::Some(*acc.key),
-            Err(_) => COption::None,
-        };
-
         faucet.is_initialized = true;
-        faucet.admin = admin_pubkey;
         faucet.amount = amount;
         faucet.mint = *mint_account.key;
 
@@ -113,15 +100,7 @@ impl Processor {
             return Err(FaucetError::InvalidMint.into());
         }
 
-        let admin_acc = next_account_info(account_info_iter);
-
-        if (faucet.admin.is_none()
-            || match admin_acc {
-                Ok(acc) => !acc.is_signer || faucet.admin.unwrap() != *acc.key,
-                Err(_) => true,
-            })
-            && amount > faucet.amount
-        {
+        if amount > faucet.amount {
             return Err(FaucetError::RequestingTooManyTokens.into());
         }
 
@@ -134,7 +113,6 @@ impl Processor {
             amount,
         )?;
 
-        info!("Calling the token program to mint tokens");
         solana_program::program::invoke_signed(
             &ix,
             &[
@@ -145,61 +123,6 @@ impl Processor {
             ],
             &[&[&b"faucet"[..], &[nonce]]],
         )?;
-        Ok(())
-    }
-
-    pub fn process_close_faucet(accounts: &[AccountInfo], program_id: &Pubkey) -> ProgramResult {
-        let account_info_iter = &mut accounts.iter();
-
-        let admin_acc = next_account_info(account_info_iter)?;
-        let faucet_acc = next_account_info(account_info_iter)?;
-        let faucet = Faucet::unpack(&faucet_acc.data.borrow())?;
-
-        if !admin_acc.is_signer {
-            return Err(ProgramError::MissingRequiredSignature);
-        }
-
-        match faucet.admin {
-            COption::None => return Err(FaucetError::NonClosableFaucetClosureAttempt.into()),
-            COption::Some(admin_pubkey) => {
-                if *admin_acc.key != admin_pubkey {
-                    return Err(FaucetError::NonAdminClosureAttempt.into());
-                }
-            }
-        }
-
-        let dest_acc = next_account_info(account_info_iter)?;
-        let dest_starting_lamports = dest_acc.lamports();
-        **dest_acc.lamports.borrow_mut() = dest_starting_lamports
-            .checked_add(faucet_acc.lamports())
-            .ok_or(FaucetError::Overflow)?;
-
-        **faucet_acc.lamports.borrow_mut() = 0;
-
-        let mint_acc = next_account_info(account_info_iter)?;
-        let spl_program_acc = next_account_info(account_info_iter)?;
-
-        let (pda, nonce) = Pubkey::find_program_address(&[b"faucet"], program_id);
-        let pda_acc = next_account_info(account_info_iter)?;
-        if pda != *pda_acc.key {
-            return Err(ProgramError::InvalidAccountData);
-        }
-
-        let transfer_authority_ix = spl_token::instruction::set_authority(
-            spl_program_acc.key,
-            mint_acc.key,
-            Some(admin_acc.key),
-            spl_token::instruction::AuthorityType::MintTokens,
-            &pda,
-            &[],
-        )?;
-
-        solana_program::program::invoke_signed(
-            &transfer_authority_ix,
-            &[mint_acc.clone(), pda_acc.clone(), spl_program_acc.clone()],
-            &[&[&b"faucet"[..], &[nonce]]],
-        )?;
-
         Ok(())
     }
 }

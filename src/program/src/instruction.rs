@@ -12,7 +12,6 @@ pub enum FaucetInstruction {
     /// 0. `[]` Token Mint Account, mint authority must equal Program Derived Address
     /// 1. `[writable]` Faucet Account
     /// 2. `[]` Rent Sysvar
-    /// 3. `[optional]` Admin Account
     InitFaucet {
         /// all other accounts may only mint this amount per ix
         amount: u64,
@@ -24,17 +23,7 @@ pub enum FaucetInstruction {
     /// 2. `[writable]` Destination Account
     /// 3. `[]` The SPL Token Program
     /// 4. `[]` The Faucet Account
-    /// 5. `[optional/signer]` Admin Account
     MintTokens { amount: u64 },
-    /// Closes the faucet, can only be done if the faucet has an admin key, transfers mint authority back to admin
-    ///
-    /// 0. `[signer]` Admin account
-    /// 1. `[writable]` Faucet account
-    /// 2. `[writable]` Destination account for rent
-    /// 3. `[writable]` Mint account
-    /// 4. `[]` The SPL Token Program
-    /// 5. `[]` The PDA
-    CloseFaucet,
 }
 
 impl FaucetInstruction {
@@ -58,7 +47,6 @@ impl FaucetInstruction {
                     .ok_or(FaucetError::InvalidInstruction)?;
                 Self::MintTokens { amount }
             }
-            2 => Self::CloseFaucet,
             _ => return Err(FaucetError::InvalidInstruction.into()),
         })
     }
@@ -74,52 +62,8 @@ impl FaucetInstruction {
                 buf.push(1);
                 buf.extend_from_slice(&amount.to_le_bytes());
             }
-            Self::CloseFaucet => {
-                buf.push(2);
-            }
         }
 
         buf
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_instruction_unpacking() {
-        // 1 tag, 1 admin, 8 amount
-        let check = FaucetInstruction::unpack(&[0, 7, 3, 0, 0, 0, 0, 0, 0]).unwrap();
-        assert_eq!(FaucetInstruction::InitFaucet { amount: 775 }, check);
-        // 1 tag,  8 amount
-        let check = FaucetInstruction::unpack(&[1, 7, 3, 0, 0, 0, 0, 0, 0]).unwrap();
-        assert_eq!(FaucetInstruction::MintTokens { amount: 775 }, check);
-
-        // 1 tag
-        let check = FaucetInstruction::unpack(&[2]).unwrap();
-        assert_eq!(FaucetInstruction::CloseFaucet, check);
-    }
-
-    #[test]
-    fn test_instruction_packing() {
-        let check = FaucetInstruction::InitFaucet { amount: 900 };
-
-        let packed = check.pack();
-        let mut expect = vec![0];
-        expect.extend_from_slice(&u64::to_le_bytes(900));
-        assert_eq!(packed, expect);
-
-        let check = FaucetInstruction::MintTokens { amount: 900 };
-
-        let packed = check.pack();
-        let mut expect = vec![1];
-        expect.extend_from_slice(&u64::to_le_bytes(900));
-        assert_eq!(packed, expect);
-
-        let check = FaucetInstruction::CloseFaucet;
-
-        let packed = check.pack();
-        assert_eq!(packed, vec![2]);
     }
 }

@@ -22,12 +22,6 @@ pub enum FaucetError {
     /// Requesting Too Many Tokens
     #[error("Requesting Too Many Tokens")]
     RequestingTooManyTokens,
-    /// Non Admin Closure Attempt
-    #[error("Non Admin Closure Attempt")]
-    NonAdminClosureAttempt,
-    /// Non Closable Faucet Closure Attempt
-    #[error("Non Closable Faucet Closure Attempt")]
-    NonClosableFaucetClosureAttempt,
     /// Overflow
     #[error("Overflow")]
     Overflow,

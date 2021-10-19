@@ -53,8 +53,5 @@
     "mkdirp-promise": "^5.0.1",
     "mz": "^2.7.0",
     "tweetnacl": "^1.0.3"
-  },
-  "engines": {
-    "node": "11.x"
   }
 }

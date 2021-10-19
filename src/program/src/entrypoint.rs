@@ -2,7 +2,7 @@
 
 use crate::processor::Processor;
 use solana_program::{
-    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, info, pubkey::Pubkey,
+    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, pubkey::Pubkey,
 };
 
 // Declare and export the program's entrypoint
@@ -14,6 +14,5 @@ fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    info!("Faucet entrypoint");
     Processor::process(program_id, accounts, instruction_data)
 }
